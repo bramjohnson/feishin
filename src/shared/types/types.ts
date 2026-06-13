@@ -2,6 +2,7 @@ import { AppRoute } from '@ts-rest/core';
 import { TFunction } from 'i18next';
 import { ReactNode } from 'react';
 
+import { NDSongQueryField, NDSongQueryOperator } from '/@/shared/api/navidrome/navidrome-types';
 import {
     Album,
     AlbumArtist,
@@ -241,18 +242,20 @@ export type PlayQueueAddOptions = {
 };
 
 export type QueryBuilderGroup = {
-    group: QueryBuilderGroup[];
     rules: QueryBuilderRule[];
-    type: 'all' | 'any';
+    subgroups: QueryBuilderGroup[];
+    type: QueryBuildGroupType;
     uniqueId: string;
 };
 
 export type QueryBuilderRule = {
-    field?: null | string;
-    operator?: null | string;
+    field?: NDSongQueryField | null;
+    operator?: NDSongQueryOperator | null;
     uniqueId: string;
     value?: any | Date | null | number | string | undefined;
 };
+
+export type QueryBuildGroupType = 'all' | 'any';
 
 export type ServerListItem = {
     credential: string;

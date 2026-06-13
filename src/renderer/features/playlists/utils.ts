@@ -1,6 +1,13 @@
 import { nanoid } from 'nanoid/non-secure';
 
-import { NDSongQueryFields } from '/@/shared/api/navidrome/navidrome-types';
+import {
+    NDAllOperators,
+    NDSongQueryAfterDateOperator,
+    NDSongQueryBeforeDateOperator,
+    NDSongQueryFields,
+    NDSongQueryInTheRangeDateOperator,
+    NDSongQueryOperator,
+} from '/@/shared/api/navidrome/navidrome-types';
 import { Album, LibraryItem, Song } from '/@/shared/types/domain-types';
 import { QueryBuilderGroup } from '/@/shared/types/types';
 
@@ -85,8 +92,8 @@ export const parseQueryBuilderChildren = (groups: QueryBuilderGroup[], data: any
 
         for (const rule of group.rules) {
             if (rule.field && rule.operator) {
-                const [table, field] = rule.field.split('.');
-                const operator = mapDatePickerOperatorToApi(rule.operator);
+                const [table, field] = rule.field.value.split('.');
+                const operator = mapDatePickerOperatorToApi(rule.operator.value);
                 const value = field !== 'releaseDate' ? rule.value : new Date(rule.value);
 
                 switch (table) {
@@ -101,8 +108,8 @@ export const parseQueryBuilderChildren = (groups: QueryBuilderGroup[], data: any
             }
         }
 
-        if (group.group.length > 0) {
-            const b = parseQueryBuilderChildren(group.group, data);
+        if (group.subgroups.length > 0) {
+            const b = parseQueryBuilderChildren(group.subgroups, data);
             b.forEach((c) => query[rootType].push(c));
         }
 
@@ -122,8 +129,8 @@ export const convertQueryGroupToNDQuery = (filter: QueryBuilderGroup) => {
 
     for (const rule of filter.rules) {
         if (rule.field && rule.operator) {
-            const [field] = rule.field.split('.');
-            const operator = mapDatePickerOperatorToApi(rule.operator);
+            const [field] = rule.field.value.split('.');
+            const operator = mapDatePickerOperatorToApi(rule.operator.value);
             let value = rule.value;
 
             const booleanFields = NDSongQueryFields.filter(
@@ -147,7 +154,7 @@ export const convertQueryGroupToNDQuery = (filter: QueryBuilderGroup) => {
         }
     }
 
-    const groups = parseQueryBuilderChildren(filter.group, []);
+    const groups = parseQueryBuilderChildren(filter.subgroups, []);
     for (const group of groups) {
         rootQuery[rootQueryType].push(group);
     }
@@ -159,8 +166,8 @@ export const convertQueryGroupToNDQuery = (filter: QueryBuilderGroup) => {
 export const convertNDQueryToQueryGroup = (query: Record<string, any>) => {
     const rootType = Object.keys(query)[0];
     const rootGroup: QueryBuilderGroup = {
-        group: [],
         rules: [],
+        subgroups: [],
         type: rootType as 'all' | 'any',
         uniqueId: nanoid(),
     };
@@ -168,27 +175,29 @@ export const convertNDQueryToQueryGroup = (query: Record<string, any>) => {
     for (const rule of query[rootType]) {
         if (rule.any || rule.all) {
             const group = convertNDQueryToQueryGroup(rule);
-            rootGroup.group.push(group);
+            rootGroup.subgroups.push(group);
         } else {
-            let operator = Object.keys(rule)[0];
-            const field = Object.keys(rule[operator])[0];
-            let value = rule[operator][field];
+            const operatorValue = Object.keys(rule)[0];
+            const operator = NDAllOperators.find((op) => op.value === operatorValue)!;
+            const fieldValue = Object.keys(rule[operator.value])[0];
+            const field = NDSongQueryFields.find((field) => field.value === fieldValue)!;
+            let value = rule[operator.value][field.value];
 
             const booleanFields = NDSongQueryFields.filter(
                 (queryField) => queryField.type === 'boolean',
             ).map((field) => field.value);
 
             // Convert boolean values to string
-            if (booleanFields.includes(field)) {
+            if (booleanFields.includes(field.value)) {
                 value = value.toString();
             }
 
             // Use date-picker operator in UI when value is date-like (e.g. YYYY-MM-DD); otherwise keep API operator
-            operator = mapApiOperatorToDatePicker(operator, value);
+            const translatedOperator = mapApiOperatorToDatePicker(operator, value);
 
             rootGroup.rules.push({
                 field,
-                operator,
+                operator: translatedOperator,
                 uniqueId: nanoid(),
                 value,
             });
@@ -212,10 +221,14 @@ function isDateRangeValue(value: unknown): value is [null | string, null | strin
     return (a == null || isDateLikeValue(a)) && (b == null || isDateLikeValue(b));
 }
 
-function mapApiOperatorToDatePicker(operator: string, value: unknown): string {
-    if (operator === 'before' && isDateLikeValue(value)) return 'beforeDate';
-    if (operator === 'after' && isDateLikeValue(value)) return 'afterDate';
-    if (operator === 'inTheRange' && isDateRangeValue(value)) return 'inTheRangeDate';
+function mapApiOperatorToDatePicker(
+    operator: NDSongQueryOperator,
+    value: unknown,
+): NDSongQueryOperator {
+    if (operator.value === 'before' && isDateLikeValue(value)) return NDSongQueryBeforeDateOperator;
+    if (operator.value === 'after' && isDateLikeValue(value)) return NDSongQueryAfterDateOperator;
+    if (operator.value === 'inTheRange' && isDateRangeValue(value))
+        return NDSongQueryInTheRangeDateOperator;
     return operator;
 }
 

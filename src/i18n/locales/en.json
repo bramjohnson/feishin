@@ -313,6 +313,8 @@
         "inTheRange": "Is in the range",
         "inTheRangeDate": "Is in the range (date)",
         "is": "Is",
+        "isMissing": "Is missing",
+        "isPresent": "Is present",
         "isNot": "Is not",
         "isGreaterThan": "Is greater than",
         "isLessThan": "Is less than",

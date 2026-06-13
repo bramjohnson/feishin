@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { QueryBuilderOption } from '/@/renderer/components/query-builder/query-builder-option';
+import { NDSongQueryFieldType, NDSongQueryOperator } from '/@/shared/api/navidrome/navidrome-types';
 import { ActionIcon } from '/@/shared/components/action-icon/action-icon';
 import { Box } from '/@/shared/components/box/box';
 import { DropdownMenu } from '/@/shared/components/dropdown-menu/dropdown-menu';
@@ -33,21 +34,25 @@ interface QueryBuilderProps {
     level: number;
     onAddRule: (args: AddArgs) => void;
     onAddRuleGroup: (args: AddArgs) => void;
-    onChangeField: (args: any) => void;
-    onChangeOperator: (args: any) => void;
+    onChangeField: (
+        groupIndex: number[],
+        level: number,
+        uniqueId: string,
+        value: null | string,
+    ) => void;
+    onChangeOperator: (
+        groupIndex: number[],
+        level: number,
+        uniqueId: string,
+        value: null | string,
+    ) => void;
     onChangeType: (args: any) => void;
     onChangeValue: (args: any) => void;
     onClearFilters: () => void;
     onDeleteRule: (args: DeleteArgs) => void;
     onDeleteRuleGroup: (args: DeleteArgs) => void;
     onResetFilters: () => void;
-    operators: {
-        boolean: { label: string; value: string }[];
-        date: { label: string; value: string }[];
-        number: { label: string; value: string }[];
-        playlist: { label: string; value: string }[];
-        string: { label: string; value: string }[];
-    };
+    operators: Record<NDSongQueryFieldType, NDSongQueryOperator[]>;
     playlists?: { label: string; value: string }[];
     saveActions?: React.ReactNode;
     uniqueId: string;

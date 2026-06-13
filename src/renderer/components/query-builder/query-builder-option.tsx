@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { Filters } from '/@/renderer/components/query-builder';
+import { NDSongQueryFieldType, NDSongQueryOperator } from '/@/shared/api/navidrome/navidrome-types';
 import { ActionIcon } from '/@/shared/components/action-icon/action-icon';
 import { DateInput } from '/@/shared/components/date-picker/date-picker';
 import { Group } from '/@/shared/components/group/group';
@@ -8,6 +9,10 @@ import { NumberInput } from '/@/shared/components/number-input/number-input';
 import { Select } from '/@/shared/components/select/select';
 import { TextInput } from '/@/shared/components/text-input/text-input';
 import { QueryBuilderRule } from '/@/shared/types/types';
+
+export interface QueryValueInputProps extends QueryValueInputByFieldProps {
+    operator: NDSongQueryOperator;
+}
 
 type DeleteArgs = {
     groupIndex: number[];
@@ -21,43 +26,120 @@ interface QueryOptionProps {
     groupIndex: number[];
     level: number;
     noRemove: boolean;
-    onChangeField: (args: any) => void;
-    onChangeOperator: (args: any) => void;
+    onChangeField: (
+        groupIndex: number[],
+        level: number,
+        uniqueId: string,
+        value: null | string,
+    ) => void;
+    onChangeOperator: (
+        groupIndex: number[],
+        level: number,
+        uniqueId: string,
+        value: null | string,
+    ) => void;
     onChangeValue: (args: any) => void;
     onDeleteRule: (args: DeleteArgs) => void;
-    operators: {
-        boolean: { label: string; value: string }[];
-        date: { label: string; value: string }[];
-        number: { label: string; value: string }[];
-        string: { label: string; value: string }[];
-    };
+    operators: Record<NDSongQueryFieldType, NDSongQueryOperator[]>;
     selectData?: { label: string; value: string }[];
 }
+
+interface QueryValueInputByFieldProps {
+    data: any;
+    defaultValue: any;
+    fieldType: NDSongQueryFieldType;
+    onChange: any;
+    value: any;
+}
+
+// Parse date value helper - converts date string (YYYY-MM-DD) to Date for display
+const parseDateValue = (val: any): Date | null => {
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    if (typeof val === 'string') {
+        // Handle YYYY-MM-DD format strings
+        const parsed = new Date(val);
+        if (isNaN(parsed.getTime())) return null;
+        return parsed;
+    }
+    return null;
+};
+
+const QueryValueInputByFieldType = ({
+    data,
+    defaultValue,
+    fieldType,
+    onChange,
+    value: valueProp,
+    ...props
+}: QueryValueInputByFieldProps) => {
+    const value = valueProp !== undefined ? valueProp : defaultValue;
+    switch (fieldType) {
+        case 'boolean':
+            return (
+                <Select
+                    data={[
+                        { label: 'true', value: 'true' },
+                        { label: 'false', value: 'false' },
+                    ]}
+                    maxWidth={100}
+                    onChange={onChange}
+                    value={value}
+                    {...props}
+                />
+            );
+        case 'date': {
+            const dateValue = value ? parseDateValue(value) : null;
+            return (
+                <DateInput
+                    clearable
+                    defaultLevel="year"
+                    maxWidth={170}
+                    onChange={(date) => {
+                        // DateInput returns string in 'YYYY-MM-DD' format (local timezone)
+                        // Return raw string value - no transformation needed
+                        onChange(date || '');
+                    }}
+                    size="sm"
+                    value={dateValue}
+                    valueFormat="YYYY-MM-DD"
+                    width="25%"
+                />
+            );
+        }
+        case 'number':
+            return (
+                <NumberInput
+                    onChange={onChange}
+                    size="sm"
+                    value={
+                        value !== undefined && value !== null && value !== ''
+                            ? Number(value)
+                            : undefined
+                    }
+                    {...props}
+                    type="text"
+                />
+            );
+        case 'playlist':
+            return <Select data={data} onChange={onChange} value={value} {...props} />;
+        case 'string':
+            return <TextInput onChange={onChange} size="sm" value={value || ''} {...props} />;
+        default:
+            return <></>;
+    }
+};
 
 const QueryValueInput = ({
     data,
     defaultValue,
+    fieldType,
     onChange,
     operator,
-    type,
     value: valueProp,
     ...props
-}: any) => {
+}: QueryValueInputProps) => {
     const [numberRange, setNumberRange] = useState<number[]>([0, 0]);
-
-    // Parse date value helper - converts date string (YYYY-MM-DD) to Date for display
-    const parseDateValue = (val: any): Date | null => {
-        if (!val) return null;
-        if (val instanceof Date) return val;
-        if (typeof val === 'string') {
-            // Handle YYYY-MM-DD format strings
-            const parsed = new Date(val);
-            if (isNaN(parsed.getTime())) return null;
-            return parsed;
-        }
-        return null;
-    };
-
     const value = valueProp !== undefined ? valueProp : defaultValue;
 
     // Store date range as strings for state management
@@ -75,7 +157,7 @@ const QueryValueInput = ({
     // Sync dateRange state when value changes
     useEffect(() => {
         const currentValue = value !== undefined ? value : defaultValue;
-        if (operator === 'inTheRangeDate' && currentValue && Array.isArray(currentValue)) {
+        if (operator.type === 'dateRange' && currentValue && Array.isArray(currentValue)) {
             setDateRange([
                 typeof currentValue[0] === 'string' ? currentValue[0] : null,
                 typeof currentValue[1] === 'string' ? currentValue[1] : null,
@@ -86,7 +168,7 @@ const QueryValueInput = ({
     // Sync numberRange state when value changes
     useEffect(() => {
         const currentValue = value !== undefined ? value : defaultValue;
-        if (operator === 'inTheRange' && currentValue && Array.isArray(currentValue)) {
+        if (operator.type === 'numberRange' && currentValue && Array.isArray(currentValue)) {
             setNumberRange([
                 typeof currentValue[0] === 'number'
                     ? currentValue[0]
@@ -98,90 +180,66 @@ const QueryValueInput = ({
         }
     }, [value, defaultValue, operator]);
 
-    // Check if operator requires DatePicker
-    const isDatePickerOperator =
-        operator === 'beforeDate' || operator === 'afterDate' || operator === 'inTheRangeDate';
-
-    switch (type) {
+    switch (operator.type) {
         case 'boolean':
+        case 'date':
+        case 'number':
+        case 'playlist':
+        case 'string':
             return (
-                <Select
-                    data={[
-                        { label: 'true', value: 'true' },
-                        { label: 'false', value: 'false' },
-                    ]}
+                <QueryValueInputByFieldType
+                    data={data}
+                    defaultValue={defaultValue}
+                    fieldType={operator.type}
                     onChange={onChange}
                     value={value}
                     {...props}
                 />
             );
-        case 'date':
-            if (isDatePickerOperator && operator !== 'inTheRangeDate') {
-                const dateValue = value ? parseDateValue(value) : null;
-                return (
+        case 'dateRange':
+            return (
+                <Group gap="sm" grow wrap="nowrap">
                     <DateInput
                         clearable
                         defaultLevel="year"
-                        maxWidth={170}
+                        maxWidth={81}
                         onChange={(date) => {
                             // DateInput returns string in 'YYYY-MM-DD' format (local timezone)
-                            // Return raw string value - no transformation needed
-                            onChange(date || '');
+                            const newRange: [null | string, null | string] = [
+                                date || null,
+                                dateRange[1],
+                            ];
+                            setDateRange(newRange);
+                            // Return raw string values - no transformation needed
+                            onChange([date || null, dateRange[1] || null]);
                         }}
                         size="sm"
-                        value={dateValue}
+                        value={dateRange[0] ? parseDateValue(dateRange[0]) : null}
                         valueFormat="YYYY-MM-DD"
-                        width="25%"
+                        width="10%"
                     />
-                );
-            }
-            return <TextInput onChange={onChange} size="sm" value={value} {...props} />;
-        case 'dateRange':
-            if (operator === 'inTheRangeDate') {
-                return (
-                    <Group gap="sm" grow wrap="nowrap">
-                        <DateInput
-                            clearable
-                            defaultLevel="year"
-                            maxWidth={81}
-                            onChange={(date) => {
-                                // DateInput returns string in 'YYYY-MM-DD' format (local timezone)
-                                const newRange: [null | string, null | string] = [
-                                    date || null,
-                                    dateRange[1],
-                                ];
-                                setDateRange(newRange);
-                                // Return raw string values - no transformation needed
-                                onChange([date || null, dateRange[1] || null]);
-                            }}
-                            size="sm"
-                            value={dateRange[0] ? parseDateValue(dateRange[0]) : null}
-                            valueFormat="YYYY-MM-DD"
-                            width="10%"
-                        />
-                        <DateInput
-                            clearable
-                            defaultLevel="year"
-                            maxWidth={81}
-                            onChange={(date) => {
-                                // DateInput returns string in 'YYYY-MM-DD' format (local timezone)
-                                const newRange: [null | string, null | string] = [
-                                    dateRange[0],
-                                    date || null,
-                                ];
-                                setDateRange(newRange);
-                                // Return raw string values - no transformation needed
-                                onChange([dateRange[0] || null, date || null]);
-                            }}
-                            size="sm"
-                            value={dateRange[1] ? parseDateValue(dateRange[1]) : null}
-                            valueFormat="YYYY-MM-DD"
-                            width="10%"
-                        />
-                    </Group>
-                );
-            }
-
+                    <DateInput
+                        clearable
+                        defaultLevel="year"
+                        maxWidth={81}
+                        onChange={(date) => {
+                            // DateInput returns string in 'YYYY-MM-DD' format (local timezone)
+                            const newRange: [null | string, null | string] = [
+                                dateRange[0],
+                                date || null,
+                            ];
+                            setDateRange(newRange);
+                            // Return raw string values - no transformation needed
+                            onChange([dateRange[0] || null, date || null]);
+                        }}
+                        size="sm"
+                        value={dateRange[1] ? parseDateValue(dateRange[1]) : null}
+                        valueFormat="YYYY-MM-DD"
+                        width="10%"
+                    />
+                </Group>
+            );
+        case 'numberRange':
             return (
                 <>
                     <NumberInput
@@ -192,6 +250,7 @@ const QueryValueInput = ({
                             setNumberRange(newRange);
                             onChange(newRange);
                         }}
+                        type="text"
                         value={numberRange[0] || undefined}
                         width="10%"
                     />
@@ -203,29 +262,23 @@ const QueryValueInput = ({
                             setNumberRange(newRange);
                             onChange(newRange);
                         }}
+                        type="text"
                         value={numberRange[1] || undefined}
                         width="10%"
                     />
                 </>
             );
-        case 'number':
+        case 'reflective': // This is how the reflective type works, it offloads duties to the `fieldType`
             return (
-                <NumberInput
+                <QueryValueInputByFieldType
+                    data={data}
+                    defaultValue={defaultValue}
+                    fieldType={fieldType}
                     onChange={onChange}
-                    size="sm"
-                    value={
-                        value !== undefined && value !== null && value !== ''
-                            ? Number(value)
-                            : undefined
-                    }
+                    value={value}
                     {...props}
                 />
             );
-        case 'playlist':
-            return <Select data={data} onChange={onChange} value={value} {...props} />;
-        case 'string':
-            return <TextInput onChange={onChange} size="sm" value={value || ''} {...props} />;
-
         default:
             return <></>;
     }
@@ -244,18 +297,18 @@ export const QueryBuilderOption = ({
     operators,
     selectData,
 }: QueryOptionProps) => {
-    const { field, operator, uniqueId, value } = data;
+    const { field: selectedField, operator: selectedOperator, uniqueId, value } = data;
 
     const handleDeleteRule = () => {
         onDeleteRule({ groupIndex, level, uniqueId });
     };
 
-    const handleChangeField = (e: any) => {
-        onChangeField({ groupIndex, level, uniqueId, value: e });
+    const handleChangeField = (e: null | string) => {
+        onChangeField(groupIndex, level, uniqueId, e);
     };
 
-    const handleChangeOperator = (e: any) => {
-        onChangeOperator({ groupIndex, level, uniqueId, value: e });
+    const handleChangeOperator = (e: null | string) => {
+        onChangeOperator(groupIndex, level, uniqueId, e);
     };
 
     const handleChangeValue = (e: any) => {
@@ -270,17 +323,6 @@ export const QueryBuilderOption = ({
                 value: e,
             });
         }
-
-        // const isDate = e instanceof Date;
-
-        // if (isDate) {
-        //   return onChangeValue({
-        //     groupIndex,
-        //     level,
-        //     uniqueId,
-        //     value: dayjs(e).format('YYYY-MM-DD'),
-        //   });
-        // }
 
         const isArray = Array.isArray(e);
 
@@ -302,11 +344,7 @@ export const QueryBuilderOption = ({
     };
 
     // Handle both grouped and flat filter data
-    const flatFilters = filters.some((f: any) => f.group && f.items)
-        ? filters.flatMap((group: any) => group.items || [])
-        : filters;
-    const fieldType = flatFilters.find((f: any) => f.value === field)?.type;
-    const operatorsByFieldType = operators[fieldType as keyof typeof operators];
+    const operatorsByFieldType = selectedField ? operators[selectedField.type] : [];
     const ml = 20;
 
     return (
@@ -317,33 +355,27 @@ export const QueryBuilderOption = ({
                 onChange={handleChangeField}
                 searchable
                 size="sm"
-                value={field}
+                value={selectedField?.value}
                 width="25%"
             />
             <Select
-                data={operatorsByFieldType || []}
-                disabled={!field}
+                data={operatorsByFieldType}
+                disabled={!selectedField}
                 maxWidth={170}
                 onChange={handleChangeOperator}
                 searchable
                 size="sm"
-                value={operator}
+                value={selectedOperator?.value}
                 width="25%"
             />
-            {field ? (
+            {selectedOperator && selectedField ? (
                 <QueryValueInput
                     data={selectData || []}
-                    maxWidth={170}
+                    defaultValue={null}
+                    fieldType={selectedField.type}
                     onChange={handleChangeValue}
-                    operator={operator}
-                    size="sm"
-                    type={
-                        operator === 'inTheRange' || operator === 'inTheRangeDate'
-                            ? 'dateRange'
-                            : fieldType
-                    }
+                    operator={selectedOperator}
                     value={value}
-                    width="25%"
                 />
             ) : (
                 <TextInput

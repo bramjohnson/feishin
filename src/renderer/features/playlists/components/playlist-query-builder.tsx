@@ -20,10 +20,14 @@ import { convertNDQueryToQueryGroup } from '/@/renderer/features/playlists/utils
 import { useCurrentServer } from '/@/renderer/store';
 import { useQueryBuilderSettings } from '/@/renderer/store/settings.store';
 import {
+    NDAllOperators,
     NDSongQueryBooleanOperators,
     NDSongQueryDateOperators,
+    NDSongQueryField,
     NDSongQueryFields,
+    NDSongQueryFieldType,
     NDSongQueryNumberOperators,
+    NDSongQueryOperator,
     NDSongQueryPlaylistOperators,
     NDSongQueryStringOperators,
 } from '/@/shared/api/navidrome/navidrome-types';
@@ -64,16 +68,18 @@ type SortEntry = {
     order: 'asc' | 'desc';
 };
 
+function createEmptyRule(): QueryBuilderRule {
+    return {
+        field: null,
+        operator: null,
+        uniqueId: nanoid(),
+        value: null,
+    };
+}
+
 const DEFAULT_QUERY: QueryBuilderGroup = {
-    group: [],
-    rules: [
-        {
-            field: '',
-            operator: '',
-            uniqueId: nanoid(),
-            value: '',
-        },
-    ],
+    rules: [createEmptyRule()],
+    subgroups: [],
     type: 'all',
     uniqueId: nanoid(),
 };
@@ -213,6 +219,22 @@ export const PlaylistQueryBuilder = forwardRef(
             [sortBy, sortOrder],
         );
 
+        const fieldReverseLookupByValueTable = useMemo(() => {
+            const reverseLookup = new Map<string, NDSongQueryField>();
+            for (const field of NDSongQueryFields) {
+                reverseLookup.set(field.value, field);
+            }
+            return reverseLookup;
+        }, []);
+
+        const operatorReverseLookupByValueTable = useMemo(() => {
+            const reverseLookup = new Map<string, NDSongQueryOperator>();
+            for (const operator of NDAllOperators) {
+                reverseLookup.set(operator.value, operator);
+            }
+            return reverseLookup;
+        }, []);
+
         const extraFiltersForm = useForm({
             initialValues: {
                 limit,
@@ -313,20 +335,7 @@ export const PlaylistQueryBuilder = forwardRef(
 
             setFilters((prev) => {
                 const currentRules = get(prev, path) || [];
-                return setWith(
-                    clone(prev),
-                    path,
-                    [
-                        ...currentRules,
-                        {
-                            field: '',
-                            operator: '',
-                            uniqueId: nanoid(),
-                            value: null,
-                        },
-                    ],
-                    clone,
-                );
+                return setWith(clone(prev), path, [...currentRules, createEmptyRule()], clone);
             });
         }, []);
 
@@ -345,28 +354,41 @@ export const PlaylistQueryBuilder = forwardRef(
             });
         }, []);
 
-        const handleChangeField = useCallback((args: any) => {
-            const { groupIndex, level, uniqueId, value } = args;
-            const path = getRulePath(level, groupIndex);
+        const handleChangeField = useCallback(
+            (groupIndex: number[], level: number, uniqueId: string, value: null | string) => {
+                if (value === null) {
+                    return;
+                }
 
-            setFilters((prev) => {
-                const currentRules = get(prev, path) || [];
-                return setWith(
-                    clone(prev),
-                    path,
-                    currentRules.map((rule: QueryBuilderRule) => {
-                        if (rule.uniqueId !== uniqueId) return rule;
-                        return {
-                            ...rule,
-                            field: value,
-                            operator: '',
-                            value: '',
-                        };
-                    }),
-                    clone,
-                );
-            });
-        }, []);
+                const path = getRulePath(level, groupIndex);
+                const selectedField = fieldReverseLookupByValueTable.get(value);
+                if (selectedField === undefined) {
+                    console.error(
+                        'Could not set field, it does not exist in the reverse lookup table...',
+                    );
+                    return;
+                }
+
+                setFilters((prev) => {
+                    const currentRules = get(prev, path) || [];
+                    return setWith(
+                        clone(prev),
+                        path,
+                        currentRules.map((rule: QueryBuilderRule) => {
+                            if (rule.uniqueId !== uniqueId) return rule;
+                            return {
+                                ...rule,
+                                field: selectedField,
+                                operator: '',
+                                value: '',
+                            };
+                        }),
+                        clone,
+                    );
+                });
+            },
+            [fieldReverseLookupByValueTable],
+        );
 
         const handleChangeType = useCallback((args: any) => {
             const { groupIndex, level, value } = args;
@@ -390,26 +412,39 @@ export const PlaylistQueryBuilder = forwardRef(
             );
         }, []);
 
-        const handleChangeOperator = useCallback((args: any) => {
-            const { groupIndex, level, uniqueId, value } = args;
-            const path = getRulePath(level, groupIndex);
+        const handleChangeOperator = useCallback(
+            (groupIndex: number[], level: number, uniqueId: string, value: null | string) => {
+                if (value === null) {
+                    return;
+                }
 
-            setFilters((prev) => {
-                const currentRules = get(prev, path) || [];
-                return setWith(
-                    clone(prev),
-                    path,
-                    currentRules.map((rule: QueryBuilderRule) => {
-                        if (rule.uniqueId !== uniqueId) return rule;
-                        return {
-                            ...rule,
-                            operator: value,
-                        };
-                    }),
-                    clone,
-                );
-            });
-        }, []);
+                const path = getRulePath(level, groupIndex);
+                const operatorFromValue = operatorReverseLookupByValueTable.get(value);
+                if (operatorFromValue === undefined) {
+                    console.error(
+                        'Could not set operator, it does not exist in the reverse lookup table...',
+                    );
+                    return;
+                }
+
+                setFilters((prev) => {
+                    const currentRules = get(prev, path) || [];
+                    return setWith(
+                        clone(prev),
+                        path,
+                        currentRules.map((rule: QueryBuilderRule) => {
+                            if (rule.uniqueId !== uniqueId) return rule;
+                            return {
+                                ...rule,
+                                operator: operatorFromValue,
+                            };
+                        }),
+                        clone,
+                    );
+                });
+            },
+            [operatorReverseLookupByValueTable],
+        );
 
         const handleChangeValue = useCallback((args: any) => {
             const { groupIndex, level, uniqueId, value } = args;
@@ -505,7 +540,7 @@ export const PlaylistQueryBuilder = forwardRef(
         );
 
         // Memoize operators object
-        const operators = useMemo(
+        const operators: Record<NDSongQueryFieldType, NDSongQueryOperator[]> = useMemo(
             () => ({
                 boolean: NDSongQueryBooleanOperators,
                 date: NDSongQueryDateOperators,

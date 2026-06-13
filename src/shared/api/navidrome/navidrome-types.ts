@@ -67,7 +67,15 @@ export enum NDSortOrder {
     DESC = 'DESC',
 }
 
-export const NDSongQueryFields = [
+export interface NDSongQueryField {
+    label: string;
+    type: NDSongQueryFieldType;
+    value: string;
+}
+
+export type NDSongQueryFieldType = 'boolean' | 'date' | 'number' | 'playlist' | 'string';
+
+export const NDSongQueryFields: NDSongQueryField[] = [
     { label: 'Album', type: 'string', value: 'album' },
     { label: 'Album Artist', type: 'string', value: 'albumartist' },
     { label: 'Album Artists', type: 'string', value: 'albumartists' },
@@ -205,127 +213,165 @@ export const NDSongQueryFieldsLabelMap: Record<string, string> = NDSongQueryFiel
     {} as Record<string, string>,
 );
 
-export const NDSongQueryPlaylistOperators = [
+export interface NDSongQueryOperator {
+    label: string;
+    type: NDSongQueryOperatorType;
+    value: string;
+}
+
+export type NDSongQueryOperatorType =
+    | 'dateRange'
+    | 'numberRange'
+    | 'reflective' // Use the same type as the QueryField, useful for the "is" and "isNot" operators
+    | NDSongQueryFieldType;
+
+const COMMON_OPERATORS: NDSongQueryOperator[] = [
+    {
+        label: i18n.t('filterOperator.is'),
+        type: 'reflective',
+        value: 'is',
+    },
+    {
+        label: i18n.t('filterOperator.isNot'),
+        type: 'reflective',
+        value: 'isNot',
+    },
+    {
+        label: i18n.t('filterOperator.isMissing'),
+        type: 'boolean',
+        value: 'isMissing',
+    },
+    {
+        label: i18n.t('filterOperator.isPresent'),
+        type: 'boolean',
+        value: 'isPresent',
+    },
+];
+
+export const NDSongQueryPlaylistOperators: NDSongQueryOperator[] = [
     {
         label: i18n.t('filterOperator.inPlaylist'),
+        type: 'boolean',
         value: 'inPlaylist',
     },
     {
         label: i18n.t('filterOperator.notInPlaylist'),
+        type: 'boolean',
         value: 'notInPlaylist',
     },
 ];
 
-export const NDSongQueryDateOperators = [
-    {
-        label: i18n.t('filterOperator.is'),
-        value: 'is',
-    },
-    {
-        label: i18n.t('filterOperator.isNot'),
-        value: 'isNot',
-    },
+export const NDSongQueryBeforeDateOperator: NDSongQueryOperator = {
+    label: i18n.t('filterOperator.beforeDate'),
+    type: 'date',
+    value: 'beforeDate',
+};
+
+export const NDSongQueryAfterDateOperator: NDSongQueryOperator = {
+    label: i18n.t('filterOperator.afterDate'),
+    type: 'date',
+    value: 'afterDate',
+};
+
+export const NDSongQueryInTheRangeDateOperator: NDSongQueryOperator = {
+    label: i18n.t('filterOperator.inTheRangeDate'),
+    type: 'dateRange',
+    value: 'inTheRangeDate',
+};
+
+export const NDSongQueryDateOperators: NDSongQueryOperator[] = [
+    ...COMMON_OPERATORS,
     {
         label: i18n.t('filterOperator.before'),
+        type: 'date',
         value: 'before',
     },
     {
         label: i18n.t('filterOperator.after'),
+        type: 'date',
         value: 'after',
     },
     {
         label: i18n.t('filterOperator.inTheLast'),
+        type: 'date',
         value: 'inTheLast',
     },
     {
         label: i18n.t('filterOperator.notInTheLast'),
+        type: 'date',
         value: 'notInTheLast',
     },
     {
         label: i18n.t('filterOperator.inTheRange'),
+        type: 'date',
         value: 'inTheRange',
     },
-    {
-        label: i18n.t('filterOperator.beforeDate'),
-        value: 'beforeDate',
-    },
-    {
-        label: i18n.t('filterOperator.afterDate'),
-        value: 'afterDate',
-    },
-    {
-        label: i18n.t('filterOperator.inTheRangeDate'),
-        value: 'inTheRangeDate',
-    },
+    NDSongQueryBeforeDateOperator,
+    NDSongQueryAfterDateOperator,
+    NDSongQueryInTheRangeDateOperator,
 ];
 
-export const NDSongQueryStringOperators = [
-    {
-        label: i18n.t('filterOperator.is'),
-        value: 'is',
-    },
-    {
-        label: i18n.t('filterOperator.isNot'),
-        value: 'isNot',
-    },
+export const NDSongQueryStringOperators: NDSongQueryOperator[] = [
+    ...COMMON_OPERATORS,
     {
         label: i18n.t('filterOperator.contains'),
+        type: 'string',
         value: 'contains',
     },
     {
         label: i18n.t('filterOperator.notContains'),
+        type: 'string',
         value: 'notContains',
     },
     {
         label: i18n.t('filterOperator.startsWith'),
+        type: 'string',
         value: 'startsWith',
     },
     {
         label: i18n.t('filterOperator.endsWith'),
+        type: 'string',
         value: 'endsWith',
     },
 ];
 
-export const NDSongQueryBooleanOperators = [
-    {
-        label: i18n.t('filterOperator.is'),
-        value: 'is',
-    },
-    {
-        label: i18n.t('filterOperator.isNot'),
-        value: 'isNot',
-    },
-];
+export const NDSongQueryBooleanOperators: NDSongQueryOperator[] = [...COMMON_OPERATORS];
 
-export const NDSongQueryNumberOperators = [
-    {
-        label: i18n.t('filterOperator.is'),
-        value: 'is',
-    },
-    {
-        label: i18n.t('filterOperator.isNot'),
-        value: 'isNot',
-    },
+export const NDSongQueryNumberOperators: NDSongQueryOperator[] = [
+    ...COMMON_OPERATORS,
     {
         label: i18n.t('filterOperator.contains'),
+        type: 'number',
         value: 'contains',
     },
     {
         label: i18n.t('filterOperator.notContains'),
+        type: 'number',
         value: 'notContains',
     },
     {
         label: i18n.t('filterOperator.isGreaterThan'),
+        type: 'number',
         value: 'gt',
     },
     {
         label: i18n.t('filterOperator.isLessThan'),
+        type: 'number',
         value: 'lt',
     },
     {
         label: i18n.t('filterOperator.inTheRange'),
+        type: 'numberRange',
         value: 'inTheRange',
     },
+];
+
+export const NDAllOperators: NDSongQueryOperator[] = [
+    ...NDSongQueryBooleanOperators,
+    ...NDSongQueryDateOperators,
+    ...NDSongQueryNumberOperators,
+    ...NDSongQueryPlaylistOperators,
+    ...NDSongQueryStringOperators,
 ];
 
 export enum NDUserListSort {
