@@ -2,6 +2,12 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { QueryBuilderOption } from '/@/renderer/components/query-builder/query-builder-option';
+import {
+    AddArgs,
+    DeleteArgs,
+    HandleChangeFieldArgs,
+    HandleChangeOperatorArgs,
+} from '/@/renderer/features/playlists/components/playlist-query-builder';
 import { NDSongQueryFieldType, NDSongQueryOperator } from '/@/shared/api/navidrome/navidrome-types';
 import { ActionIcon } from '/@/shared/components/action-icon/action-icon';
 import { Box } from '/@/shared/components/box/box';
@@ -17,15 +23,6 @@ export type FilterGroup = { group: string; items: FilterItem[] };
 export type FilterItem = { label: string; type: string; value: string };
 
 export type Filters = FilterGroup[] | FilterItem[];
-type AddArgs = {
-    groupIndex: number[];
-    level: number;
-};
-type DeleteArgs = {
-    groupIndex: number[];
-    level: number;
-    uniqueId: string;
-};
 
 interface QueryBuilderProps {
     data: Record<string, any>;
@@ -34,18 +31,8 @@ interface QueryBuilderProps {
     level: number;
     onAddRule: (args: AddArgs) => void;
     onAddRuleGroup: (args: AddArgs) => void;
-    onChangeField: (
-        groupIndex: number[],
-        level: number,
-        uniqueId: string,
-        value: null | string,
-    ) => void;
-    onChangeOperator: (
-        groupIndex: number[],
-        level: number,
-        uniqueId: string,
-        value: null | string,
-    ) => void;
+    onChangeField: (args: HandleChangeFieldArgs) => void;
+    onChangeOperator: (args: HandleChangeOperatorArgs) => void;
     onChangeType: (args: any) => void;
     onChangeValue: (args: any) => void;
     onClearFilters: () => void;
@@ -201,9 +188,9 @@ export const QueryBuilder = ({
                         />
                     </div>
                 ))}
-                {data?.group && (
+                {data?.subgroups && (
                     <>
-                        {data.group?.map((group: QueryBuilderGroup, index: number) => (
+                        {data.subgroups?.map((group: QueryBuilderGroup, index: number) => (
                             <div key={group.uniqueId}>
                                 <QueryBuilder
                                     data={group}

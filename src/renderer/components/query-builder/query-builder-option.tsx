@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 
 import { Filters } from '/@/renderer/components/query-builder';
+import {
+    DeleteArgs,
+    HandleChangeFieldArgs,
+    HandleChangeOperatorArgs,
+} from '/@/renderer/features/playlists/components/playlist-query-builder';
 import { NDSongQueryFieldType, NDSongQueryOperator } from '/@/shared/api/navidrome/navidrome-types';
 import { ActionIcon } from '/@/shared/components/action-icon/action-icon';
 import { DateInput } from '/@/shared/components/date-picker/date-picker';
@@ -10,38 +15,22 @@ import { Select } from '/@/shared/components/select/select';
 import { TextInput } from '/@/shared/components/text-input/text-input';
 import { QueryBuilderRule } from '/@/shared/types/types';
 
-export interface QueryValueInputProps extends QueryValueInputByFieldProps {
-    operator: NDSongQueryOperator;
-}
-
-type DeleteArgs = {
-    groupIndex: number[];
-    level: number;
-    uniqueId: string;
-};
-
-interface QueryOptionProps {
+export interface QueryBuilderOptionProps {
     data: QueryBuilderRule;
     filters: Filters;
     groupIndex: number[];
     level: number;
     noRemove: boolean;
-    onChangeField: (
-        groupIndex: number[],
-        level: number,
-        uniqueId: string,
-        value: null | string,
-    ) => void;
-    onChangeOperator: (
-        groupIndex: number[],
-        level: number,
-        uniqueId: string,
-        value: null | string,
-    ) => void;
+    onChangeField: (args: HandleChangeFieldArgs) => void;
+    onChangeOperator: (args: HandleChangeOperatorArgs) => void;
     onChangeValue: (args: any) => void;
     onDeleteRule: (args: DeleteArgs) => void;
     operators: Record<NDSongQueryFieldType, NDSongQueryOperator[]>;
     selectData?: { label: string; value: string }[];
+}
+
+export interface QueryValueInputProps extends QueryValueInputByFieldProps {
+    operator: NDSongQueryOperator;
 }
 
 interface QueryValueInputByFieldProps {
@@ -296,7 +285,7 @@ export const QueryBuilderOption = ({
     onDeleteRule,
     operators,
     selectData,
-}: QueryOptionProps) => {
+}: QueryBuilderOptionProps) => {
     const { field: selectedField, operator: selectedOperator, uniqueId, value } = data;
 
     const handleDeleteRule = () => {
@@ -304,11 +293,11 @@ export const QueryBuilderOption = ({
     };
 
     const handleChangeField = (e: null | string) => {
-        onChangeField(groupIndex, level, uniqueId, e);
+        onChangeField({ groupIndex, level, uniqueId, value: e });
     };
 
     const handleChangeOperator = (e: null | string) => {
-        onChangeOperator(groupIndex, level, uniqueId, e);
+        onChangeOperator({ groupIndex, level, uniqueId, value: e });
     };
 
     const handleChangeValue = (e: any) => {

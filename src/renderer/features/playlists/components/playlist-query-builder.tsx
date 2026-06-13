@@ -23,7 +23,6 @@ import {
     NDAllOperators,
     NDSongQueryBooleanOperators,
     NDSongQueryDateOperators,
-    NDSongQueryField,
     NDSongQueryFields,
     NDSongQueryFieldType,
     NDSongQueryNumberOperators,
@@ -43,16 +42,25 @@ import { useForm } from '/@/shared/hooks/use-form';
 import { PlaylistListSort, SongListSort, SortOrder } from '/@/shared/types/domain-types';
 import { QueryBuilderGroup, QueryBuilderRule } from '/@/shared/types/types';
 
-type AddArgs = {
+export type AddArgs = {
     groupIndex: number[];
     level: number;
 };
 
-type DeleteArgs = {
+export type DeleteArgs = {
     groupIndex: number[];
     level: number;
     uniqueId: string;
 };
+
+export type HandleChangeFieldArgs = {
+    groupIndex: number[];
+    level: number;
+    uniqueId: string;
+    value: null | string;
+};
+
+export type HandleChangeOperatorArgs = HandleChangeFieldArgs;
 
 interface PlaylistQueryBuilderProps {
     limit?: number;
@@ -219,22 +227,6 @@ export const PlaylistQueryBuilder = forwardRef(
             [sortBy, sortOrder],
         );
 
-        const fieldReverseLookupByValueTable = useMemo(() => {
-            const reverseLookup = new Map<string, NDSongQueryField>();
-            for (const field of NDSongQueryFields) {
-                reverseLookup.set(field.value, field);
-            }
-            return reverseLookup;
-        }, []);
-
-        const operatorReverseLookupByValueTable = useMemo(() => {
-            const reverseLookup = new Map<string, NDSongQueryOperator>();
-            for (const operator of NDAllOperators) {
-                reverseLookup.set(operator.value, operator);
-            }
-            return reverseLookup;
-        }, []);
-
         const extraFiltersForm = useForm({
             initialValues: {
                 limit,
@@ -281,8 +273,7 @@ export const PlaylistQueryBuilder = forwardRef(
             setFilters(DEFAULT_QUERY);
         }, []);
 
-        const handleAddRuleGroup = useCallback((args: AddArgs) => {
-            const { groupIndex, level } = args;
+        const handleAddRuleGroup = useCallback(({ groupIndex, level }: AddArgs) => {
             const path = getGroupPath(level, groupIndex);
 
             setFilters((prev) => {
@@ -311,8 +302,7 @@ export const PlaylistQueryBuilder = forwardRef(
             });
         }, []);
 
-        const handleDeleteRuleGroup = useCallback((args: DeleteArgs) => {
-            const { groupIndex, level, uniqueId } = args;
+        const handleDeleteRuleGroup = useCallback(({ groupIndex, level, uniqueId }) => {
             const path = level === 0 ? 'group' : getGroupPath(level - 1, groupIndex.slice(0, -1));
 
             setFilters((prev) => {
@@ -329,8 +319,7 @@ export const PlaylistQueryBuilder = forwardRef(
             });
         }, []);
 
-        const handleAddRule = useCallback((args: AddArgs) => {
-            const { groupIndex, level } = args;
+        const handleAddRule = useCallback(({ groupIndex, level }: AddArgs) => {
             const path = getRulePath(level, groupIndex);
 
             setFilters((prev) => {
@@ -339,8 +328,7 @@ export const PlaylistQueryBuilder = forwardRef(
             });
         }, []);
 
-        const handleDeleteRule = useCallback((args: DeleteArgs) => {
-            const { groupIndex, level, uniqueId } = args;
+        const handleDeleteRule = useCallback(({ groupIndex, level, uniqueId }: DeleteArgs) => {
             const path = getRulePath(level, groupIndex);
 
             setFilters((prev) => {
@@ -355,17 +343,15 @@ export const PlaylistQueryBuilder = forwardRef(
         }, []);
 
         const handleChangeField = useCallback(
-            (groupIndex: number[], level: number, uniqueId: string, value: null | string) => {
+            ({ groupIndex, level, uniqueId, value }: HandleChangeFieldArgs) => {
                 if (value === null) {
                     return;
                 }
 
                 const path = getRulePath(level, groupIndex);
-                const selectedField = fieldReverseLookupByValueTable.get(value);
+                const selectedField = NDSongQueryFields.find((field) => field.value === value);
                 if (selectedField === undefined) {
-                    console.error(
-                        'Could not set field, it does not exist in the reverse lookup table...',
-                    );
+                    console.error('Could not set field, it does not exist...');
                     return;
                 }
 
@@ -387,7 +373,7 @@ export const PlaylistQueryBuilder = forwardRef(
                     );
                 });
             },
-            [fieldReverseLookupByValueTable],
+            [],
         );
 
         const handleChangeType = useCallback((args: any) => {
@@ -413,17 +399,15 @@ export const PlaylistQueryBuilder = forwardRef(
         }, []);
 
         const handleChangeOperator = useCallback(
-            (groupIndex: number[], level: number, uniqueId: string, value: null | string) => {
+            ({ groupIndex, level, uniqueId, value }: HandleChangeOperatorArgs) => {
                 if (value === null) {
                     return;
                 }
 
                 const path = getRulePath(level, groupIndex);
-                const operatorFromValue = operatorReverseLookupByValueTable.get(value);
+                const operatorFromValue = NDAllOperators.find((op) => op.value === value);
                 if (operatorFromValue === undefined) {
-                    console.error(
-                        'Could not set operator, it does not exist in the reverse lookup table...',
-                    );
+                    console.error('Could not set operator, it does not exist...');
                     return;
                 }
 
@@ -443,7 +427,7 @@ export const PlaylistQueryBuilder = forwardRef(
                     );
                 });
             },
-            [operatorReverseLookupByValueTable],
+            [],
         );
 
         const handleChangeValue = useCallback((args: any) => {
